@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>📚 Biblioteca Digital D"Israel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: url("https://images.unsplash.com/photo-1529156069898-49953e39b3ac") no-repeat center center fixed;
+      background-size: cover;
+      color: #333;
+    }
+    header {
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 { margin: 0; }
+    section {
+      background: rgba(255, 255, 255, 0.9);
+      padding: 20px;
+      margin: 20px auto;
+      border-radius: 10px;
+      max-width: 800px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    label { display: block; margin-top: 10px; }
+    input, textarea, button {
+      margin-top: 5px;
+      padding: 8px;
+      width: 100%;
+      max-width: 500px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      cursor: pointer;
+      background: #007BFF;
+      color: white;
+      border: none;
+      transition: 0.3s;
+    }
+    button:hover { background: #0056b3; }
+    .results { margin-top: 15px; }
+    .card {
+      background: white;
+      border: 1px solid #ddd;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .actions button {
+      margin-right: 10px;
+      padding: 5px 10px;
+    }
+    img { max-height: 100px; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="/IMG/LOGO.png" alt="Biblioteca Digital D'Israel" style="max-height:150px; max-width:300px; object-fit:contain;">
+    <p>Gestiona tus libros y busca en Google Books</p>
+  </header>
+
+  <!-- ========================= -->
+  <!--   CRUD Libros (MySQL)     -->
+  <!-- ========================= -->
+  <section>
+    <h2>Mis libros (Base de Datos)</h2>
+
+    <form id="form-agregar">
+      <label>Título: <input type="text" name="titulo" required></label>
+      <label>Autor: <input type="text" name="autor" required></label>
+      <label>Año: <input type="number" name="anio"></label>
+      <label>ISBN: <input type="text" name="isbn"></label>
+      <label>Descripción: <textarea name="descripcion"></textarea></label>
+      <button type="submit">➕ Agregar libro</button>
+    </form>
+
+    <h3>Buscar en mis libros</h3>
+    <input type="text" id="search-mysql" placeholder="Buscar por título o descripción...">
+    <button onclick="buscarMySQL()">🔍 Buscar</button>
+
+    <div id="resultados-mysql" class="results"></div>
+  </section>
+
+  <!-- ========================= -->
+  <!--  Google Books (API Externa) -->
+  <!-- ========================= -->
+  <section>
+    <h2>Google Books</h2>
+
+    <input type="text" id="search-google" placeholder="Buscar en Google Books...">
+    <button onclick="buscarGoogle()">🔍 Buscar</button>
+
+    <div id="resultados-google" class="results"></div>
+  </section>
+
+  <script>
+    const apiBase = window.location.origin;
+
+    // ===============================
+    //   Agregar libro (POST)
+    // ===============================
+    document.getElementById('form-agregar').addEventListener('submit', async e => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target));
+      const res = await fetch(apiBase + '/libros', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const result = await res.json();
+      alert('Libro agregado con ID: ' + result.id);
+      e.target.reset();
+      buscarMySQL();
+    });
+
+    // ===============================
+    //   Buscar libros (GET)
+    // ===============================
+    async function buscarMySQL() {
+      const q = document.getElementById('search-mysql').value;
+      const res = await fetch(apiBase + '/libros?search=' + encodeURIComponent(q));
+      const data = await res.json();
+      const cont = document.getElementById('resultados-mysql');
+      cont.innerHTML = data.map(l => `
+        <div class="card">
+          <b>${l.titulo}</b> - ${l.autor} (${l.anio || 's/f'})
+          <br>ISBN: ${l.isbn || 'N/A'}
+          <p>${l.descripcion || ''}</p>
+          <div class="actions">
+            <button onclick="editarLibro(${l.id}, '${l.titulo}', '${l.autor}', '${l.anio || ''}', '${l.isbn || ''}', \`${l.descripcion || ''}\`)">✏️ Editar</button>
+            <button onclick="eliminarLibro(${l.id})">❌ Eliminar</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ===============================
+    //   Editar libro (PATCH)
+    // ===============================
+    async function editarLibro(id, titulo, autor, anio, isbn, descripcion) {
+      const nuevoTitulo = prompt("Nuevo título:", titulo);
+      if (!nuevoTitulo) return;
+      const nuevoAutor = prompt("Nuevo autor:", autor);
+      const nuevoAnio = prompt("Nuevo año:", anio);
+      const nuevoIsbn = prompt("Nuevo ISBN:", isbn);
+      const nuevaDescripcion = prompt("Nueva descripción:", descripcion);
+
+      const res = await fetch(apiBase + '/libros/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          titulo: nuevoTitulo,
+          autor: nuevoAutor,
+          anio: nuevoAnio,
+          isbn: nuevoIsbn,
+          descripcion: nuevaDescripcion
+        })
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        alert("Libro actualizado ✅");
+        buscarMySQL();
+      } else {
+        alert("Error: " + result.error);
+      }
+    }
+
+    // ===============================
+    //   Eliminar libro (DELETE)
+    // ===============================
+    async function eliminarLibro(id) {
+      if (!confirm("¿Seguro que quieres eliminar este libro?")) return;
+      const res = await fetch(apiBase + '/libros/' + id, { method: 'DELETE' });
+      const result = await res.json();
+      if (result.success) {
+        alert("Libro eliminado ❌");
+        buscarMySQL();
+      } else {
+        alert("Error: " + result.error);
+      }
+    }
+
+    // ===============================
+    //   Buscar en Google Books
+    // ===============================
+    async function buscarGoogle() {
+      const q = document.getElementById('search-google').value;
+      const res = await fetch(apiBase + '/buscar?q=' + encodeURIComponent(q));
+      const data = await res.json();
+      const cont = document.getElementById('resultados-google');
+      cont.innerHTML = data.map(l => `
+        <div class="card">
+          <b>${l.titulo}</b> - ${l.autores.join(', ')}
+          <br><img src="${l.portada || ''}" alt="sin portada">
+          <p>${l.descripcion || ''}</p>
+          <a href="${l.link}" target="_blank">Ver más</a>
+        </div>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
